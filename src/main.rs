@@ -1,5 +1,7 @@
 use clap::Parser;
 use num_cpus;
+use std::fs::File;
+use std::io::prelude::*;
 use std::io::Write;
 use std::{io, thread};
 use std::{net::IpAddr, net::TcpStream, sync::mpsc::channel, sync::mpsc::Sender};
@@ -17,6 +19,9 @@ struct Args {
     //number of threads to use, default value is num of logical threads
     #[clap(short = 'j', long, value_parser, default_value_t = num_cpus::get() as u32)]
     threads: u32,
+    //path to file to save to
+    #[clap(short = 'o', long, value_parser)]
+    path: Option<String>,
 }
 
 fn scan(tx: Sender<u32>, start_port: u32, addr: IpAddr, num_threads: u32) {
@@ -45,6 +50,15 @@ fn scan(tx: Sender<u32>, start_port: u32, addr: IpAddr, num_threads: u32) {
     }
 }
 
+fn save_port_list(open_ports: Vec<u32>, path: String) {
+    let mut file = File::create(path).expect("Cannot open file");
+    for p in open_ports {
+        let mut p = p.to_string();
+        p.push_str("\n");
+        file.write(p.as_bytes()).expect("cannot write to file");
+    }
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -66,11 +80,16 @@ fn main() {
     for p in receiver {
         open_ports.push(p);
     }
+
     println!("\n");
 
     open_ports.sort();
 
-    for v in open_ports {
+    for v in &open_ports {
         println!("open port: {}", v);
+    }
+    //if o flag is passed as argument then save to the specified path
+    if let Some(path) = args.path {
+        save_port_list(open_ports, path);
     }
 }
